@@ -3,20 +3,10 @@ const router = express.Router( {mergeParams: true}); // if do not do this, the c
 const catchAsync = require('../utils/catchAsync');
 // const Joi = require('joi'); we have done this in schemas.js
 const {reviewSchema} = require('../schemas.js');
-
+const {validateReview} = require('../middleware');
 const ExpressError = require('../utils/ExpressError');
 const campground = require('../models/campground');
 const Review = require('../models/review');
-
-const validateReview = (req, res, next) => {
-  const { error } = reviewSchema.validate(req.body);
-  if (error) {
-      const msg = error.details.map(el => el.message).join(',')
-      throw new ExpressError(msg, 400)
-  } else {
-      next();
-  }
-}
 
 router.post('/', validateReview, catchAsync(async (req, res) => {
   const campgrounds = await campground.findById(req.params.id); 
