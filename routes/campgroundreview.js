@@ -3,14 +3,15 @@ const router = express.Router( {mergeParams: true}); // if do not do this, the c
 const catchAsync = require('../utils/catchAsync');
 // const Joi = require('joi'); we have done this in schemas.js
 const {reviewSchema} = require('../schemas.js');
-const {validateReview} = require('../middleware');
+const {validateReview, isLoggedIn, isReviewAuthor} = require('../middleware');
 const ExpressError = require('../utils/ExpressError');
 const campground = require('../models/campground');
 const Review = require('../models/review');
 
-router.post('/', validateReview, catchAsync(async (req, res) => {
+router.post('/', isLoggedIn, validateReview, catchAsync(async (req, res) => {
   const campgrounds = await campground.findById(req.params.id); 
   const review = new Review(req.body.review);
+  review.author = req.user._id;
   campgrounds.reviews.push(review);
   await review.save();
   await campgrounds.save();
@@ -18,7 +19,7 @@ router.post('/', validateReview, catchAsync(async (req, res) => {
   res.redirect(`/campgrounds/${campgrounds._id}`);
 }))
 
-router.delete('/:reviewId', catchAsync(async (req, res) => {
+router.delete('/:reviewId', isLoggedIn, isReviewAuthor, catchAsync(async (req, res) => {
   const { id, reviewId } = req.params;
   await campground.findByIdAndUpdate(id, { $pull: { reviews: reviewId } }); // delete specific review with specific ID
   await Review.findByIdAndDelete(reviewId);
