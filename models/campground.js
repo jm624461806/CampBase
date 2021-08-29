@@ -12,6 +12,8 @@ ImageSchema.virtual('thumbnail').get(function () {
   return this.url.replace('/upload', '/upload/w_200');
 });
 
+const opts = { toJSON: { virtuals: true } };
+
 const CampGroundSchema = new Schema({
   title: String,
   images: [ImageSchema],
@@ -41,6 +43,12 @@ const CampGroundSchema = new Schema({
     }
   ]
 
+}, opts);
+
+CampGroundSchema.virtual('properties.popUpMarkup').get(function () {
+  return `
+  <strong><a href="/campgrounds/${this._id}">${this.title}</a><strong>
+  <p>${this.description.substring(0, 20)}...</p>`
 });
 
 // mongoose query middleware to delete all the review associated with the deleted campground 
