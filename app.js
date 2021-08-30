@@ -18,7 +18,15 @@ const campgrounds = require('./routes/campgrounds');
 const reviews = require('./routes/campgroundreview');
 const userRoutes = require('./routes/users');
 
-mongoose.connect('mongodb://localhost:27017/yelp-camp', {
+const mongoSanitize = require('express-mongo-sanitize');
+const helmet = require('helmet');
+
+const MongoDBStore = require("connect-mongodb-session")(session);
+
+const dbUrl = process.env.DB_URL || 'mongodb://localhost:27017/yelp-camp';
+// process.env.DB_URL;
+
+mongoose.connect(dbUrl, {
     useNewUrlParser: true,
     useCreateIndex: true,
     useUnifiedTopology: true,
@@ -42,13 +50,27 @@ app.use(express.urlencoded({ extended: true }));
 app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, 'public'))) // to have public directory so no need to /punlic
 
+
+const secret = process.env.SECRET ||  'thisshouldbeabettersecret!';
+const store = new MongoDBStore({
+  url: dbUrl,
+  secret,
+  touchAfter: 24 * 60 * 60
+})
+
+store.on("error", function(e) {
+  console.log("SESSION STORE ERROR", e)
+})
+
 // session part
 const sessionConfig = {
-  secret: 'thisshouldbeabettersecret!',
+  store,
+  secret,
   resave: false,
   saveUninitialized: true,
   cookie: {
       httpOnly: true,
+      // secure : true
       expires: Date.now() + 1000 * 60 * 60 * 24 * 7, // expires after one week
       maxAge: 1000 * 60 * 60 * 24 * 7 // same as above
   }
@@ -56,6 +78,51 @@ const sessionConfig = {
 
 app.use(session(sessionConfig))
 app.use(flash());
+app.use(helmet());
+
+const scriptSrcUrls = [
+  "https://stackpath.bootstrapcdn.com/",
+  "https://api.tiles.mapbox.com/",
+  "https://api.mapbox.com/",
+  "https://kit.fontawesome.com/",
+  "https://cdnjs.cloudflare.com/",
+  "https://cdn.jsdelivr.net",
+];
+const styleSrcUrls = [
+  "https://kit-free.fontawesome.com/",
+  "https://stackpath.bootstrapcdn.com/",
+  "https://api.mapbox.com/",
+  "https://api.tiles.mapbox.com/",
+  "https://fonts.googleapis.com/",
+  "https://use.fontawesome.com/",
+];
+const connectSrcUrls = [
+  "https://api.mapbox.com/",
+  "https://a.tiles.mapbox.com/",
+  "https://b.tiles.mapbox.com/",
+  "https://events.mapbox.com/",
+];
+const fontSrcUrls = [];
+app.use(
+  helmet.contentSecurityPolicy({
+      directives: {
+          defaultSrc: [],
+          connectSrc: ["'self'", ...connectSrcUrls],
+          scriptSrc: ["'unsafe-inline'", "'self'", ...scriptSrcUrls],
+          styleSrc: ["'self'", "'unsafe-inline'", ...styleSrcUrls],
+          workerSrc: ["'self'", "blob:"],
+          objectSrc: [],
+          imgSrc: [
+              "'self'",
+              "blob:",
+              "data:",
+              "https://res.cloudinary.com/diznkioow/",
+              "https://images.unsplash.com/",
+          ],
+          fontSrc: ["'self'", ...fontSrcUrls],
+      },
+  })
+);
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -73,6 +140,11 @@ app.use((req, res, next) => {
 app.use('/', userRoutes);
 app.use('/campgrounds', campgrounds);
 app.use('/campgrounds/:id/reviews', reviews);
+
+
+app.get('/', (req, res) => {
+  res.render('home')
+});
 
 app.all('*', (req, res, next) => {
   next(new ExpressError('Page Not Found', 404))
